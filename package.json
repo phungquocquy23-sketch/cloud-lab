@@ -1,0 +1,26 @@
+{
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "mongoose": "^9.9.3"
+  },
+  "name": "cloud-lab",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phungquocquy23-sketch/cloud-lab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/phungquocquy23-sketch/cloud-lab/issues"
+  },
+  "homepage": "https://github.com/phungquocquy23-sketch/cloud-lab#readme"
+}
