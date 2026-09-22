@@ -2,25 +2,28 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
-  // Câu 47: State quản lý danh sách sinh viên
   const [students, setStudents] = useState([])
-
-  // Câu 48: State quản lý dữ liệu form
+  const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
     mssv: '',
     name: '',
     email: ''
   })
 
-  // Câu 47: Gọi GET /api/students từ Backend API
+  const fetchStudents = async () => {
+    try {
+      const response = await fetch('/api/students')
+      if (!response.ok) throw new Error('Không thể tải danh sách sinh viên')
+      setStudents(await response.json())
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách sinh viên:', error)
+    }
+  }
+
   useEffect(() => {
-    fetch('/api/students')
-      .then((res) => res.json())
-      .then((data) => setStudents(data))
-      .catch((err) => console.error("Lỗi khi tải danh sách sinh viên:", err))
+    fetchStudents()
   }, [])
 
-  // Câu 48: Cập nhật giá trị ô input
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({
@@ -29,47 +32,87 @@ function App() {
     }))
   }
 
-  // Câu 49: Xử lý Submit Form để POST dữ liệu lên server
+  const resetForm = () => {
+    setFormData({ mssv: '', name: '', email: '' })
+    setEditingId(null)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-
     const payload = {
       studentId: formData.mssv,
       name: formData.name,
       email: formData.email
     }
+    const isEditMode = Boolean(editingId)
 
     try {
-      const response = await fetch('/api/students', {
-        method: 'POST',
+      const response = await fetch(isEditMode ? `/api/students/${editingId}` : '/api/students', {
+        method: isEditMode ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       })
 
-      if (response.ok) {
-        alert('Thêm sinh viên thành công!')
-        const newStudent = await response.json()
-
-        setStudents((prev) => [...prev, newStudent])
-        setFormData({ mssv: '', name: '', email: '' })
-      } else {
-        const errData = await response.json().catch(() => ({}))
-        console.error('Lỗi chi tiết từ Backend:', errData)
-        alert('Thêm thất bại, vui lòng kiểm tra lại backend!')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Yêu cầu thất bại')
       }
+
+      const savedStudent = await response.json()
+      setStudents((prev) => isEditMode
+        ? prev.map((student) => (student._id || student.id) === editingId ? savedStudent : student)
+        : [...prev, savedStudent]
+      )
+      alert(isEditMode ? 'Cập nhật sinh viên thành công!' : 'Thêm sinh viên thành công!')
+      resetForm()
     } catch (error) {
-      console.error('Lỗi khi gửi dữ liệu:', error)
-      alert('Không thể kết nối đến server!')
+      console.error('Lỗi khi lưu dữ liệu:', error)
+      alert(isEditMode ? 'Cập nhật thất bại!' : 'Thêm thất bại!')
+    }
+  }
+
+  const handleEdit = (student) => {
+    const studentId = student._id || student.id
+    if (!studentId) {
+      alert('Không xác định được sinh viên cần sửa!')
+      return
+    }
+
+    setEditingId(studentId)
+    setFormData({
+      mssv: student.studentId || student.mssv || '',
+      name: student.name || student.fullName || '',
+      email: student.email || ''
+    })
+  }
+
+  const handleDelete = async (student) => {
+    const studentId = student._id || student.id
+    if (!studentId) {
+      alert('Không xác định được sinh viên cần xóa!')
+      return
+    }
+    if (!window.confirm(`Bạn có chắc muốn xóa sinh viên ${student.name || student.studentId}?`)) return
+
+    try {
+      const response = await fetch(`/api/students/${studentId}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Xóa thất bại')
+
+      setStudents((prev) => prev.filter((item) => (item._id || item.id) !== studentId))
+      if (editingId === studentId) resetForm()
+      alert('Xóa sinh viên thành công!')
+    } catch (error) {
+      console.error('Lỗi khi xóa sinh viên:', error)
+      alert('Xóa thất bại, vui lòng thử lại!')
     }
   }
 
   return (
     <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      {/* Câu 48 & 49: Form nhập MSSV, Họ tên và Email */}
       <section style={{ marginBottom: '30px', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-        <h2>Nhập thông tin sinh viên</h2>
+        <h2>{editingId ? 'Cập nhật thông tin sinh viên' : 'Nhập thông tin sinh viên'}</h2>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', marginBottom: '4px' }}>MSSV:</label>
@@ -104,24 +147,39 @@ function App() {
               required
             />
           </div>
-          <button type="submit" style={{ padding: '8px 16px', cursor: 'pointer' }}>
-            Lưu thông tin
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="submit" style={{ padding: '8px 16px', cursor: 'pointer' }}>
+              {editingId ? 'Cập nhật' : 'Lưu thông tin'}
+            </button>
+            {editingId && (
+              <button type="button" onClick={resetForm} style={{ padding: '8px 16px', cursor: 'pointer' }}>
+                Hủy
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
-      {/* Câu 47: Hiển thị danh sách sinh viên từ API */}
       <section style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
         <h2>Danh sách sinh viên</h2>
         {students.length === 0 ? (
           <p>Không có dữ liệu hoặc đang tải...</p>
         ) : (
           <ul style={{ paddingLeft: '20px' }}>
-            {students.map((student, index) => (
-              <li key={student._id || student.id || index} style={{ marginBottom: '8px' }}>
-                <strong>{student.studentId || student.mssv || student.studentCode}</strong> - {student.name || student.fullName} ({student.email})
-              </li>
-            ))}
+            {students.map((student, index) => {
+              const studentKey = student._id || student.id || student.studentId || index
+              return (
+                <li key={studentKey} style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <span>
+                    <strong>{student.studentId || student.mssv || student.studentCode}</strong> - {student.name || student.fullName} ({student.email})
+                  </span>
+                  <span style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => handleEdit(student)} style={{ cursor: 'pointer' }}>Sửa</button>
+                    <button type="button" onClick={() => handleDelete(student)} style={{ cursor: 'pointer' }}>Xóa</button>
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
